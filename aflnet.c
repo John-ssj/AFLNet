@@ -1502,6 +1502,132 @@ unsigned int* extract_response_codes_ipp(unsigned char* buf, unsigned int buf_si
   return state_sequence;
 }
 
+// MQTT
+region_t* extract_requests_mqtt(unsigned char* buf, unsigned int buf_size, unsigned int* region_count_ref)
+{
+    unsigned int msg_length = 0;
+    unsigned int packet_length = 0;
+    unsigned int region_count = 0;
+    unsigned int end = 0;
+    unsigned int start = 0;
+
+    region_t *regions = NULL;
+
+    unsigned int byte_count = 0;
+    while (byte_count < buf_size) {
+
+        // 第1位是协议类型，第2位-第5位是msg长度。最少1+1=2位，最长1+4=5位
+        if (byte_count + 2 > buf_size) break;
+
+        // 计算msg长度
+        unsigned char digit;
+        msg_length = 0;
+        int multiplier = 1;
+        int index = 0;  // 剩余长度字段起始位置的下标
+        do {
+            index++;
+            if(byte_count + index > buf_size) break;
+            digit = buf[byte_count + index];
+            msg_length += ((digit & 0x7F) * multiplier);
+            if (multiplier >= 128*128*128) break;
+            multiplier *= 128;
+        } while ((digit & 0x80) != 0);
+
+        packet_length = 1 + index + msg_length;
+
+        start = byte_count;
+        end = byte_count + packet_length - 1;
+
+        if (end < start) break; // it means that int overflow has happened -_0_0_-
+        if (end >= buf_size) break; // checking boundaries
+
+        region_count++;
+        regions = (region_t *)ck_realloc(regions, region_count * sizeof(region_t));
+        regions[region_count - 1].start_byte = start;
+        regions[region_count - 1].end_byte = end;
+        regions[region_count - 1].state_sequence = NULL;
+        regions[region_count - 1].state_count = 0;
+
+        if ( (byte_count + packet_length) < byte_count ) break; // checking int overflow
+        if ( (byte_count + packet_length) < packet_length ) break; // checking int overflow
+        byte_count += packet_length;
+    }
+
+    // if bytes is left
+    if ((byte_count < buf_size) && (buf_size > 0)) {
+        region_count++;
+        regions = (region_t *)ck_realloc(regions, region_count * sizeof(region_t));
+        regions[region_count - 1].start_byte = byte_count;
+        regions[region_count - 1].end_byte = buf_size - 1;
+        regions[region_count - 1].state_sequence = NULL;
+        regions[region_count - 1].state_count = 0;
+    }
+
+    *region_count_ref = region_count;
+    return regions;
+}
+
+unsigned int* extract_response_codes_mqtt(unsigned char* buf, unsigned int buf_size, unsigned int* state_count_ref)
+{
+    if (buf_size == 0) {
+        *state_count_ref = 0;
+        return NULL;
+    }
+//    if(buf_size != 4){
+//        printf("buf_size: %d\n",buf_size);
+//    }
+
+    unsigned int *state_sequence = NULL;
+    unsigned int state_count = 0;
+
+    state_count++;
+    state_sequence = (unsigned int *)ck_realloc(state_sequence, state_count * sizeof(unsigned int));
+    state_sequence[state_count - 1] = 0; // initial status code is 0
+
+    unsigned int byte_count = 0;
+    while (byte_count < buf_size) {
+
+        // 第1位是协议类型，第2位-第5位是msg长度。最少1+1=2位，最长1+4=5位
+        if (byte_count + 2 > buf_size) break;
+
+        // 计算msg长度
+        unsigned char digit;
+        unsigned int packet_length = 0;
+        unsigned int msg_length = 0;
+        int multiplier = 1;
+        int index = 0;  // 剩余长度字段起始位置的下标
+        do {
+            index++;
+            if(byte_count + index > buf_size) break;
+            digit = buf[byte_count + index];
+            msg_length += ((digit & 0x7F) * multiplier);
+            if (multiplier >= 128*128*128) break;
+            multiplier *= 128;
+        } while ((digit & 0x80) != 0);
+
+        packet_length = 1 + index + msg_length;
+
+        if (byte_count + packet_length - 1 < byte_count) break; // it means that int overflow has happened -_0_0_-
+        if (byte_count + packet_length - 1 >= buf_size) break; // checking boundaries
+
+        state_count++;
+        unsigned char message_code = buf[byte_count]>>4; // return Header type as status code
+//        if(message_code != 2) {
+//            printf("%d, %d\n", buf[byte_count], message_code);
+//        }
+        state_sequence = (unsigned int *)ck_realloc(state_sequence, state_count * sizeof(unsigned int));
+        state_sequence[state_count - 1] = message_code;
+
+        if ( (byte_count + packet_length) < byte_count ) break; // checking int overflow
+        if ( (byte_count + packet_length) < packet_length ) break; // checking int overflow
+        byte_count += packet_length;
+    }
+
+    *state_count_ref = state_count;
+    return state_sequence;
+}
+
+
 // kl_messages manipulating functions
 
 klist_t(lms) *construct_kl_messages(u8* fname, region_t *regions, u32 region_count)
