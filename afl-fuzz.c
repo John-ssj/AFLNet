@@ -72,6 +72,9 @@
 #include <graphviz/gvc.h>
 #include <math.h>
 
+#include "MQTTPacket.h"
+#include "include/MQTTPacket.h"
+
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 #  include <sys/sysctl.h>
 #endif /* __APPLE__ || __FreeBSD__ || __OpenBSD__ */
@@ -6023,6 +6026,9 @@ AFLNET_REGIONS_SELECTION:;
    * SIMPLE BITFLIP (+dictionary construction) *
    *********************************************/
 
+
+
+
 #define FLIP_BIT(_ar, _b) do { \
     u8* _arf = (u8*)(_ar); \
     u32 _bf = (_b); \
@@ -7024,8 +7030,8 @@ havoc_stage:
 
     for (i = 0; i < use_stacking; i++) {
 
-      switch (UR(15 + 2 + (region_level_mutation ? 4 : 0))) {
-
+//      switch (UR(15 + 2 + (region_level_mutation ? 4 : 0))) {
+      switch (21) {
         case 0:
 
           /* Flip a single bit somewhere. Spooky! */
@@ -7471,7 +7477,11 @@ havoc_stage:
             temp_len += temp_len;
             break;
           }
-
+          case 21: {
+              int err;
+              MQTTPacket_factory_test(5, out_buf, temp_len, &err);
+              break;
+          }
       }
 
     }

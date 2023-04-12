@@ -21,3 +21,10 @@ afl-llvm-pass.so
 afl-llvm-rt-32.o
 afl-llvm-rt-64.o
 afl-llvm-rt.o
+
+# others
+.DS_Store
+.clion.source.upload.marker
+.idea
+afl-gcc.dSYM
+tutorials/mosquitto
