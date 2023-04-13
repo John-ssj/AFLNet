@@ -72,8 +72,8 @@
 #include <graphviz/gvc.h>
 #include <math.h>
 
-#include "MQTTPacket.h"
-#include "include/MQTTPacket.h"
+#include "mqttParser/MQTTParser.h"
+//#include "include/MQTTPacket.h"
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 #  include <sys/sysctl.h>
@@ -7478,8 +7478,8 @@ havoc_stage:
             break;
           }
           case 21: {
-              int err;
-              MQTTPacket_factory_test(5, out_buf, temp_len, &err);
+              modify_mqtt_connect_message(&out_buf, &temp_len);
+//              MQTTPacket_factory_test(5, out_buf, temp_len, &err);
               break;
           }
       }
