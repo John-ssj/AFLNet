@@ -16,7 +16,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <printf.h>
 
 #include "MQTTProperties.h"
 
@@ -382,9 +381,8 @@ MQTTProperties MQTTProperties_copy(const MQTTProperties *props) {
 
     for (i = 0; i < props->count; ++i) {
         int rc = 0;
-
-        if ((rc = MQTTProperties_add(&result, &props->array[i])) != 0)
-            printf("Error from MQTTProperties add %d", rc);
+        rc = MQTTProperties_add(&result, &props->array[i]);
+//        if (rc != 0) { printf("Error from MQTTProperties add %d", rc); }
     }
 
     return result;

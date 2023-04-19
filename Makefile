@@ -27,7 +27,7 @@ MISC_PATH   = $(PREFIX)/share/afl
 PROGS       = afl-gcc afl-fuzz afl-replay aflnet-replay afl-showmap afl-tmin afl-gotcpu afl-analyze
 SH_PROGS    = afl-plot afl-cmin afl-whatsup
 
-CFLAGS     ?= -O3 -funroll-loops
+CFLAGS     ?= -O0 -funroll-loops
 CFLAGS     += -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign -Wno-unused-result \
 	      -DAFL_PATH=\"$(HELPER_PATH)\" -DDOC_PATH=\"$(DOC_PATH)\" \
 	      -DBIN_PATH=\"$(BIN_PATH)\"
@@ -70,6 +70,14 @@ afl-as: afl-as.c afl-as.h $(COMM_HDR) | test_x86
 	ln -sf afl-as as
 
 mqttParser_obj := MQTTParser.o MQTTProperties.o MQTTHelper.o
+
+MQTTParser.o : mqttParser/MQTTParser.c
+	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+MQTTProperties.o : mqttParser/MQTTProperties.c
+	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+MQTTHelper.o : mqttParser/MQTTHelper.c
+	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+
 afl-fuzz: afl-fuzz.c $(COMM_HDR) aflnet.o aflnet.h $(mqttParser_obj) mqttParser/MQTTParser.h | test_x86
 	$(CC) $(CFLAGS) $@.c aflnet.o $(mqttParser_obj) -o $@ $(LDFLAGS)
 
