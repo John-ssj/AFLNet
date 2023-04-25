@@ -198,9 +198,9 @@ int modify_mqtt_connect_message(char **message, size_t *message_len) {
     MQTTProperty userProp_1 = {.identifier=MQTTPROPERTY_CODE_USER_PROPERTY, .value={.data={4, "name"}, .value={4,
                                                                                                                "john"}}};
     MQTTProperties_add(&connect.properties, &userProp_1);
-    MQTTProperty userProp_2 = {.identifier=MQTTPROPERTY_CODE_USER_PROPERTY, .value={.data={4, "data"}, .value={4,
-                                                                                                               "0405"}}};
-    MQTTProperties_add(&connect.properties, &userProp_2);
+//    MQTTProperty userProp_2 = {.identifier=MQTTPROPERTY_CODE_USER_PROPERTY, .value={.data={4, "data"}, .value={4,
+//                                                                                                               "0405"}}};
+//    MQTTProperties_add(&connect.properties, &userProp_2);
     update_mqtt_connect_message_length(&connect);
 
     if(*message != NULL) {

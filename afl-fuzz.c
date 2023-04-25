@@ -169,6 +169,8 @@ static volatile u8 stop_soon,         /* Ctrl-C pressed?                  */
 clear_screen = 1,  /* Window resized?                  */
 child_timed_out;   /* Traced process timed out?        */
 
+EXP_ST u32 dos_dir_num;
+
 EXP_ST u32 queued_paths,              /* Total number of queued testcases */
 queued_variable,           /* Testcases with variable behavior */
 queued_at_start,           /* Total number of initial inputs   */
@@ -1733,6 +1735,50 @@ EXP_ST void read_bitmap(u8 *fname) {
 }
 
 
+int remove_dir(const char *dir)
+{
+    char cur_dir[] = ".";
+    char up_dir[] = "..";
+    char dir_name[128];
+    DIR *dirp;
+    struct dirent *dp;
+    struct stat dir_stat;
+
+    // 参数传递进来的目录不存在，直接返回
+    if ( 0 != access(dir, F_OK) ) {
+        return 0;
+    }
+
+    // 获取目录属性失败，返回错误
+    if ( 0 > stat(dir, &dir_stat) ) {
+        perror("get directory stat error");
+        return -1;
+    }
+
+    if ( S_ISREG(dir_stat.st_mode) ) {  // 普通文件直接删除
+        remove(dir);
+    } else if ( S_ISDIR(dir_stat.st_mode) ) {   // 目录文件，递归删除目录中内容
+        dirp = opendir(dir);
+        while ( (dp=readdir(dirp)) != NULL ) {
+            // 忽略 . 和 ..
+            if ( (0 == strcmp(cur_dir, dp->d_name)) || (0 == strcmp(up_dir, dp->d_name)) ) {
+                continue;
+            }
+
+            sprintf(dir_name, "%s/%s", dir, dp->d_name);
+            remove_dir(dir_name);   // 递归调用
+        }
+        closedir(dirp);
+
+        rmdir(dir);     // 删除空目录
+    } else {
+        perror("unknow file type!");
+    }
+
+    return 0;
+}
+
+
 /* Check if the current execution path brings anything new to the table.
    Update virgin bits to reflect the finds. Returns 1 if the only change is
    the hit-count for a particular tuple; 2 if there are new tuples seen.
@@ -1806,6 +1852,7 @@ static inline u8 has_new_bits(u8 *virgin_map) {
 
     if (ret && virgin_map == virgin_bits) bitmap_changed = 1;
 
+    int flag = 0;
     if (ret != 0) {
         current = (u64 *) trace_bits;
         u8 max_bits = 0x00;
@@ -1823,9 +1870,19 @@ static inline u8 has_new_bits(u8 *virgin_map) {
         }
         printf("\nmax_func: %d\n\n", max_bits);
         if(max_bits == 0xff) {
-            printf("queue_num%d\n", queue_cur->region_count);
-            u8 *fn = alloc_printf("%s/my_queue_out", out_dir);
+            flag = 1;
+//            printf("\ndir_save:%06u/\n", dos_dir_num);
+//            printf("queue_num%d\n", queue_cur->region_count);
+            u8 *fn = alloc_printf("%s/dos/id:%06u/my_queue_out", out_dir, dos_dir_num);
             u32 full_len = save_kl_messages_to_file(kl_messages, fn, 0, messages_sent);
+        }
+    }
+    if(!flag) {
+        u8 *fn_queue_out = alloc_printf("%s/dos/id:%06u/my_queue_out", out_dir, dos_dir_num);
+        if(access(fn_queue_out, 0) != 0) {
+        u8 *fn = alloc_printf("%s/dos/id:%06u/", out_dir, dos_dir_num);
+        remove_dir(fn);
+//        printf("\ndir:%06u/\n", dos_dir_num);
         }
     }
     return ret;
@@ -2008,9 +2065,22 @@ static const u8 count_class_lookup8[256] = {
         [4 ... 7]     = 8,
         [8 ... 15]    = 16,
         [16 ... 31]   = 32,
-        [32 ... 127]  = 64,
-        [128 ... 255] = 128
-
+//        [32 ... 127]  = 64,
+//        [128 ... 255] = 128
+        [32 ... 47]   = 38,
+        [48 ... 63]   = 48,
+        [64 ... 79]   = 64,
+        [80 ... 95]   = 80,
+        [96 ... 111]  = 96,
+        [112 ... 127] = 112,
+        [128 ... 143] = 128,
+        [144 ... 159] = 144,
+        [160 ... 175] = 160,
+        [176 ... 191] = 176,
+        [192 ... 207] = 192,
+        [208 ... 223] = 208,
+        [224 ... 239] = 224,
+        [240 ... 255] = 240,
 };
 
 static u16 count_class_lookup16[65536];
@@ -7118,11 +7188,18 @@ static u8 fuzz_one(char **argv) {
 
     for (stage_cur = 0; stage_cur < stage_max; stage_cur++) {
 
-        u32 use_stacking = 1 << (1 + UR(HAVOC_STACK_POW2));
+//        u32 use_stacking = 1 << (1 + UR(HAVOC_STACK_POW2));
 
-        stage_cur_val = use_stacking;
+//        stage_cur_val = use_stacking;
+        stage_cur_val = 2*stage_cur+1;
 
-        for (i = 0; i < use_stacking; i++) {
+        dos_dir_num += 1;
+        char *tmp_dir = alloc_printf("%s/dos/id:%06u/", out_dir, dos_dir_num);
+        if (mkdir(tmp_dir, 0700)) PFATAL("Unable to create '%s'", tmp_dir);
+        ck_free(tmp_dir);
+
+//        for (i = 0; i < use_stacking; i++) {
+        for (i = 0; i < 2*stage_cur+1; i++) {
 
 //      switch (UR(15 + 2 + (region_level_mutation ? 4 : 0))) {
             switch (21) {
@@ -7579,6 +7656,11 @@ static u8 fuzz_one(char **argv) {
                 }
             }
 
+            char *fname = alloc_printf("%s/dos/id:%06u/%d", out_dir, dos_dir_num, i);
+            s32 tmpfd = open(fname, O_WRONLY | O_CREAT, 0600);
+            if (tmpfd < 0) PFATAL("Unable to create file '%s'", fname);
+            ck_write(tmpfd, out_buf, temp_len, fname);
+            close(tmpfd);
         }
 
         if (common_fuzz_stuff(argv, out_buf, temp_len))
@@ -8243,6 +8325,7 @@ EXP_ST void setup_dirs_fds(void) {
     if (sync_id && mkdir(sync_dir, 0700) && errno != EEXIST)
         PFATAL("Unable to create '%s'", sync_dir);
 
+    remove_dir(out_dir);
     if (mkdir(out_dir, 0700)) {
 
         if (errno != EEXIST) PFATAL("Unable to create '%s'", out_dir);
@@ -8264,6 +8347,10 @@ EXP_ST void setup_dirs_fds(void) {
 #endif /* !__sun */
 
     }
+
+    tmp = alloc_printf("%s/dos", out_dir);
+    if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
+    ck_free(tmp);
 
     /* Queue directory for any starting & discovered paths. */
 
